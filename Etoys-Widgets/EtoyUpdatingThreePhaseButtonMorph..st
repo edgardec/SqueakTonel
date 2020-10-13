@@ -1,0 +1,57 @@
+"
+A slight variation wherein the actionSelector and getSelector both take argument(s).
+"
+Class {
+	#name : #EtoyUpdatingThreePhaseButtonMorph,
+	#superclass : #UpdatingThreePhaseButtonMorph,
+	#classVars : [
+		'CheckedForm',
+		'MouseDownForm',
+		'UncheckedForm'
+	],
+	#category : #'Etoys-Widgets'
+}
+
+{ #category : #'instance creation' }
+EtoyUpdatingThreePhaseButtonMorph class >> checkBox [
+	"Answer a button pre-initialized with checkbox images."
+
+	"(Form extent: 12@12 depth: 32) morphEdit"
+	CheckedForm ifNil: [
+		self setForms: 24
+	].
+	^self new
+		onImage: CheckedForm;
+		pressedImage: MouseDownForm;
+		offImage: UncheckedForm;
+		extent: CheckedForm extent;
+		yourself
+
+]
+
+{ #category : #'as yet unclassified' }
+EtoyUpdatingThreePhaseButtonMorph class >> setForms [
+
+CheckedForm := (Form
+	extent: 12@12
+	depth: 32
+	fromArray: #( 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 0 0 0 0 0 0 0 0 0 0 4278190081 4278190081 0 0 0 0 0 0 0 0 0 4278190081 4278190081 4278190081 0 0 0 0 0 0 0 0 4278190081 2003331177 4278190081 4278190081 0 0 0 0 0 0 0 4278190081 2003331177 0 4278190081 4278190081 0 0 0 0 0 0 4278190081 2003331177 0 0 4278190081 4278190081 0 4278190081 0 0 0 4278190081 2003331177 0 0 0 4278190081 4278190081 0 2003331177 4278190081 0 4278190081 2003331177 0 0 0 0 4278190081 4278190081 0 0 2003331177 4278190081 2003331177 0 0 0 0 0 4278190081 4278190081 0 0 0 2003331177 0 0 0 0 0 0 4278190081 4278190081 0 0 0 0 0 0 0 0 0 0 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081)
+	offset: 0@0).
+MouseDownForm := UncheckedForm := (Form
+	extent: 12@12
+	depth: 32
+	fromArray: #( 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 0 0 0 0 0 0 0 0 0 0 4278190081 4278190081 0 0 0 0 0 0 0 0 0 0 4278190081 4278190081 0 0 0 0 0 0 0 0 0 0 4278190081 4278190081 0 0 0 0 0 0 0 0 0 0 4278190081 4278190081 0 0 0 0 0 0 0 0 0 0 4278190081 4278190081 0 0 0 0 0 0 0 0 0 0 4278190081 4278190081 0 0 0 0 0 0 0 0 0 0 4278190081 4278190081 0 0 0 0 0 0 0 0 0 0 4278190081 4278190081 0 0 0 0 0 0 0 0 0 0 4278190081 4278190081 0 0 0 0 0 0 0 0 0 0 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081 4278190081)
+	offset: 0@0)
+]
+
+{ #category : #'stepping and presenter' }
+EtoyUpdatingThreePhaseButtonMorph >> step [
+	| newBoolean |
+
+	state == #pressed ifTrue: [^ self].
+	newBoolean := target perform: getSelector withArguments: arguments.
+	newBoolean == self isOn
+		ifFalse:
+			[self state: (newBoolean ifTrue: [#on] ifFalse: [#off])]
+
+]

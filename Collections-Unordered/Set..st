@@ -1,0 +1,236 @@
+"
+I represent a set of objects without duplicates.  I can hold anything that responds to
+#hash and #=, except for nil.  My instances will automatically grow, if necessary.
+Note that I rely on #=, not #==.  If you want a set using #==, use IdentitySet.
+
+Instance structure:
+
+  array	An array whose non-nil elements are the elements of the set,
+		and whose nil elements are empty slots.  There is always at least one nil.
+		In fact I try to keep my ""load"" at 75% or less so that hashing will work well.
+
+  tally	The number of elements in the set.  The array size is always greater than this.
+
+The core operation is #scanFor:, which either finds the position where an
+object is stored in array, if it is present, or finds a suitable position holding nil, if
+its argument is not present in array.
+
+I can include an UndefinedObject (nil) thanks to a special implementation using a wrapper (see message #asSetElement and class SetElement).
+Indeed, a nil entry in the storage array means vacuity, it cannot mean I contain nil.
+"
+Class {
+	#name : #Set,
+	#superclass : #HashedCollection,
+	#category : #'Collections-Unordered'
+}
+
+{ #category : #'instance creation' }
+Set class >> newFrom: aCollection [ 
+	"Answer an instance of me containing the same elements as aCollection."
+	| newCollection |
+	newCollection := self new: aCollection size.
+	newCollection addAll: aCollection.
+	^ newCollection
+"
+	Set newFrom: {1. 2. 3}
+	{1. 2. 3} as: Set
+"
+]
+
+{ #category : #initialization }
+Set class >> quickRehashAllSets [
+	
+	self deprecated: 'Use HashedCollection >> #rehashAll'.	
+	HashedCollection rehashAll
+]
+
+{ #category : #initialization }
+Set class >> rehashAllSets [
+	
+	self deprecated: 'Use HashedCollection >> #rehashAll'.	
+	HashedCollection rehashAll
+]
+
+{ #category : #comparing }
+Set >> = anObject [
+	"Two sets are equal if
+	 (a) they are the same 'kind' of thing.
+	 (b) they have the same set of keys.
+	 (c) for each (common) key, they have the same value"
+
+	self == anObject ifTrue: [ ^true ].
+	self species == anObject species ifFalse: [ ^false ].
+	self size = anObject size ifFalse: [ ^false ].
+	^self allSatisfy: [ :each | anObject includes: each ]
+]
+
+{ #category : #adding }
+Set >> add: newObject [
+	"Include newObject as one of the receiver's elements, but only if
+	not already present. Answer newObject."
+
+	| index |
+	index := self scanFor: newObject.
+	(array at: index) ifNil: [self atNewIndex: index put: newObject asSetElement].
+	^ newObject
+]
+
+{ #category : #adding }
+Set >> addIfNotPresent: anObject [
+	"Include anObject as one of the receiver's elements, but only if there
+	 is no such element already. Anwser anObject."
+
+	^self add: anObject
+]
+
+{ #category : #converting }
+Set >> asSet [
+	^self
+]
+
+{ #category : #enumerating }
+Set >> collect: aBlock [ 
+	"Evaluate aBlock with each of the receiver's elements as the argument.  
+	Collect the resulting values into a collection like the receiver. Answer  
+	the new collection."
+
+	| newSet |
+	newSet := Set new: self size.
+	self do: [ :each | newSet add: (aBlock value: each) ].
+	^newSet
+]
+
+{ #category : #copying }
+Set >> copyWithout: oldElement [ 
+	"Answer a copy of the receiver that does not contain any
+	elements equal to oldElement."
+
+	^ self copy
+		remove: oldElement ifAbsent: [];
+		yourself
+]
+
+{ #category : #enumerating }
+Set >> do: aBlock [ 
+
+	tally = 0 ifTrue: [ ^self ].
+	1 to: array size do: [ :index |
+		(array at: index) ifNotNil: [ :element |
+			aBlock value: element enclosedSetElement] ]
+]
+
+{ #category : #private }
+Set >> fixCollisionsFrom: start [
+	"The element at start has been removed and replaced by nil.
+	This method moves forward from there, relocating any entries
+	that had been placed below due to collisions with this one."
+
+	| element index |
+	index := start.
+	[ (element := array at: (index := index \\ array size + 1)) == nil ] whileFalse: [
+		| newIndex |
+		(newIndex := self scanFor: element enclosedSetElement) = index ifFalse: [
+			array 
+				at: newIndex put: element;
+				at: index put: nil ] ]
+]
+
+{ #category : #adding }
+Set >> ifAbsentAdd: anObject [ 
+	"Ensure anObject is part of the receiver.  Answer whether its membership was newly acquired."
+	| index |
+	index := self scanFor: anObject.
+	(array at: index) ifNil:
+		[self
+			atNewIndex: index
+			put: anObject asSetElement.
+		^true].
+	^false
+]
+
+{ #category : #testing }
+Set >> includes: anObject [ 
+	
+	(array at: (self scanFor: anObject)) ifNil: [ ^false ] ifNotNil: [ ^true ]
+]
+
+{ #category : #accessing }
+Set >> like: anObject [
+	"Answer an object in the receiver that is equal to anObject,
+	nil if no such object is found. Relies heavily on hash properties"
+
+	^(array at: (self scanFor: anObject)) ifNotNil:[:obj| obj enclosedSetElement]
+]
+
+{ #category : #accessing }
+Set >> like: anObject ifAbsent: aBlock [
+	"Answer an object in the receiver that is equal to anObject,
+	or evaluate the block if not found. Relies heavily on hash properties"
+	
+	^(array at: (self scanFor: anObject))
+		ifNil: [ aBlock value ]
+		ifNotNil: [ :element | element enclosedSetElement ]
+]
+
+{ #category : #private }
+Set >> noCheckNoGrowFillFrom: anArray [
+	"Add the elements of anArray except nils to me assuming that I don't contain any of them, they are unique and I have more free space than they require."
+
+	1 to: anArray size do: [ :index |
+		(anArray at: index) ifNotNil: [ :object |
+			array
+				at: (self scanForEmptySlotFor: object enclosedSetElement)
+				put: object ] ]
+]
+
+{ #category : #enumerating }
+Set >> occurrencesOf: anObject [
+	"Answer how many of the receiver's elements are equal to anObject. Optimized version."
+
+	(self includes: anObject) ifTrue: [ ^1 ].
+	^0
+]
+
+{ #category : #copying }
+Set >> postCopy [
+	super postCopy.
+	array := array copy
+]
+
+{ #category : #removing }
+Set >> remove: oldObject ifAbsent: aBlock [
+
+	| index |
+	index := self scanFor: oldObject.
+	(array at: index) ifNil: [ ^ aBlock value ].
+	array at: index put: nil.
+	tally := tally - 1.
+	self fixCollisionsFrom: index.
+	^ oldObject
+]
+
+{ #category : #private }
+Set >> scanFor: anObject [
+	"Scan the key array for the first slot containing either a nil (indicating an empty slot) or an element that matches anObject. Answer the index of that slot or raise an error if no slot is found. This method will be overridden in various subclasses that have different interpretations for matching elements."
+
+	| index start size |
+	index := start := anObject hash \\ (size := array size) + 1.
+	[ 
+		| element |
+		((element := array at: index) == nil or: [ anObject = element enclosedSetElement ])
+			ifTrue: [ ^index ].
+		(index := index \\ size + 1) = start ] whileFalse.
+	self errorNoFreeSpace
+]
+
+{ #category : #enumerating }
+Set >> select: aBlock [ 
+	"Use copyEmpty instead of self species new to give subclasses a chance to initialize additional inst vars."
+
+	"Note: this code could be moved to super"
+	
+	| newCollection |
+	newCollection := self copyEmpty.
+	self do: [:each | (aBlock value: each) ifTrue: [newCollection add: each]].
+	^newCollection
+]
